@@ -16,9 +16,7 @@
   - Sleepy Pi 2
 
   Comments:
-  - Gaining full control over the Watchdog Timer requires that RocketScream's 
-  Low Power library be removed. This requires removing it as a public class from
-  the Sleepy Pi 2 library.
+  - This code
 
   To test on the RPi without power cycling and using the Arduino IDE
   to view the debug messages, comment out the following lines:
@@ -30,8 +28,10 @@
   Also either fit the Power Jumper or enable self-power:
   http://spellfoundry.com/sleepy-pi/programming-arduino-ide/
 
-  When the RPi is below the shutdown current threshold (milliamps) it is "shutdown"
+  Shutdown current threshold in mA.
+  when the RPi is below this, it is "shutdown"
   This will vary from RPi model to RPi model
+  and you will need to fine tune it for each RPi
 */
 
 // Libraries
@@ -53,13 +53,13 @@
 tmElements_t tm;
 
 // User defined global variable declarations
-unsigned long awakeTime         = 60000; // Max RPi awake time in milliseconds (ms)
+unsigned long awakeTime         = 15000; // Max RPi awake time in milliseconds (ms)
 unsigned int  currentThreshold  = 110;  // Shutdown current threshold in milliamps (mA)
 
 // Global variable and constant declarations
-volatile bool alarmFlag             = false;  // Flag for alarm interrupt service routine
-volatile bool watchdogFlag          = false;  // Flag for Watchdog Timer interrupt service routine
-volatile int  watchdogCounter       = 0;      // Watchdog Timer interrupt counter
+volatile bool alarmFlag         = false;  // Flag for alarm interrupt service routine
+volatile bool watchdogFlag      = false;  // Flag for Watchdog Timer interrupt service routine
+volatile int  watchdogCounter   = 0;      // Watchdog Timer interrupt counter
 
 bool          ledState        = LOW;    // Flag to toggle LED in blinkLed() function
 bool          piPowerFlag     = true;   // Flag to indicate if Raspberry Pi is running
@@ -134,12 +134,9 @@ void loop() {
 
     digitalWrite(LED_PIN, HIGH); // Turn on LED
 
-    Serial.println("Alarm trigger: ");
+    Serial.print("Alarm trigger: "); printDateTime();
 
-    // Print the RTC's current date and time
-    printDateTime();
-
-    //digitalWrite(LED_PIN, LOW);   // Turn off LED
+    digitalWrite(LED_PIN, LOW);   // Turn off LED
 
     // Do something on the Rpi here
     // Example: Take a Picture
@@ -161,6 +158,7 @@ void loop() {
 
       // Monitor the current draw of the RPi to deteremine if is is running
       piPowerFlag = SleepyPi.checkPiStatus(currentThreshold, false);
+      petDog();
       delay(1000);
 
       // For debugging issue a "sudo shutdown -h now" command and monitor the current draw
@@ -192,17 +190,6 @@ void loop() {
 
   blinkLed(1, 100);
   goToSleep();
-}
-
-void goToSleep_old() {
-
-  Serial.println("Entering deep sleep");
-  Serial.flush();
-
-  // Enter power down state with ADC and BOD module disabled
-  // Wake up when alarm sets wake up pin is low
-  //LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
-
 }
 
 // Enable sleep and await RTC alarm interrupt
@@ -307,6 +294,7 @@ ISR(WDT_vect) {
 
 void petDog() {
   wdt_reset(); // "Pet" the dog
+  Serial.print(F("Watchdog interrupt: ")); Serial.println(watchdogCounter);
   watchdogFlag = false; // Clear watchdog flag
   watchdogCounter = 0; // Reset watchdog interrupt counter
 }
@@ -376,5 +364,4 @@ void printRtcRegisters(void) {
   reg_value = SleepyPi.rtcReadReg(PCF8523_TMR_B_REG);
   Serial.print("TMR_B_REG: 0x");
   Serial.println(reg_value, HEX);
-
 }
